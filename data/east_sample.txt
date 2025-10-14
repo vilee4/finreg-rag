@@ -1,0 +1,22 @@
+商业银行监管数据标准化规范（EAST 5.0）——客户基本信息表（ECIF）
+
+1. 表名：ECIF（Enterprise Customer Information File）
+2. 报送频率：T+1日（交易日后一个工作日内）
+3. 数据完整性要求：100%
+4. 必填字段：
+   - CUST_ID（客户ID）：18位唯一标识，不可为空
+   - CUST_NAME（客户姓名）：使用公安系统登记姓名
+   - ID_TYPE（证件类型）：1-身份证，2-护照，3-军官证
+   - ID_NO（证件号码）：与证件类型匹配
+   - GENDER（性别）：0-未知，1-男，2-女
+   - BIRTH_DATE（出生日期）：格式YYYYMMDD
+5. 校验规则：
+   - ECIF_001：CUST_ID 长度必须为18位
+   - ECIF_002：ID_TYPE 与 ID_NO 必须逻辑一致
+   - ECIF_003：CUST_NAME 不得包含特殊字符
+
+交易流水表（ACCT_TXN）补充说明：
+- TXN_DATE：交易日期（YYYYMMDD）
+- TXN_AMT：交易金额（单位：元，保留两位小数）
+- COUNTERPARTY_NAME：对手方名称
+- RETENTION_PERIOD：数据保留不少于5年
