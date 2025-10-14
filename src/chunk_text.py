@@ -6,6 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # chunk_size 每个文本块的大小
 # chunk_overlap 块之间重叠的大小
 def chunk_text(text:str, chunk_size=300, chunk_overlap=50):
+    # 递归尝试不同的分隔符，直到将文本分割成符合要求的小块 
     splitter=RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
