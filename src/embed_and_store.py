@@ -65,7 +65,7 @@ def main():
     collection.add(
         ids = ids,
         documents =  texts,
-        embeddings = embeddings.tolist() # 将list转为json
+        embeddings = embeddings.tolist() # 将list转为json 嵌入向量函数 生成文本的向量
     )
     print(f"向量数据已保存至：{vector_db_path}")
 
