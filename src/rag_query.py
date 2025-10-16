@@ -41,26 +41,43 @@ def rag_query(user_question: str, top_k: int = 3) -> str:
     results = collection.query(
         query_embeddings=query_embedding,
         n_results=top_k,
-        include=["documents", "distances"],
+        include=["documents", "distances"],  ## Chroma（>=0.4.22） 中include 不在支持 ids 显示指定，总是返回
     )
 
-    # 拼接上下文
-    contents = results["documents"][0]
-    context_text = "\n\n".join([f"片段{i+1}:\n{ctx}" for i, ctx in enumerate(contents)])
+    # 构建 [片段1]: ... 格式
+    context_blocks = []
+    source = []
+    for i, (doc,doc_id, dist) in enumerate(zip(
+        results["documents"][0]
+        ,results["ids"][0]
+        ,results["distances"][0])
+    ):
+        similarity = 1-dist   #  转为相似度 (0-1)
+        snippet = doc[:200].replace("\n", " ") + ("..." if len(doc) > 200 else "")
 
-    print(f"检索到{len(contents)}个相关规则片段")
-    for i, ctx in enumerate(contents):
-        print(f"----片段{i+1}----\n{ctx[:200]}...")
+        context_blocks.append(f"[片段{i+1}]: {doc}")
+        source.append({
+            "id": doc_id,
+            "text": doc,
+            "similarity": round(similarity,4),  # 距离转相似度
+            "snippet": snippet
+        })
+
+    # # 拼接上下文
+    # contents = results["documents"][0]
+    context_text = "\n\n".join(context_blocks)
 
     # 构建 prompt 金融合规场景
     prompt = f"""
-    你是一名专业的金融合规顾问，请根据以下监管规定片段，严谨、准确地回答用户问题。
-    要求：
-    1. 仅基于提供的片段回答，不要编造
-    2. 引用具体条款（如“根据片段1”）
-    3. 若片段不相关或信息不足，请回答“根据现有资料无法确定”
+    你是一名专业的金融合规顾问，请严格根据以下【监管原文片段】回答用户问题。
 
-    监管规定片段：
+    回答规则：
+    1. 仅使用【监管原文片段】中的信息，禁止编造、推测或使用外部知识。
+    2. 若问题无法从片段中回答，请明确说：“根据当前提供的监管资料，无法回答该问题。”
+    3. 引用时必须使用格式：[片段1]、[片段2] 等。
+    4. 回答应简洁、专业、准确。
+
+    【监管原文片段】
     {context_text}
 
     用户问题：{user_question}
@@ -75,22 +92,47 @@ def rag_query(user_question: str, top_k: int = 3) -> str:
         prompt=prompt,
         temperature=0.3,  ## 降低随机性，提高准确性
         max_tokens=500,
+        top_p=0.8
     )
 
     if response.status_code == 200:
-        return response.output.text
+        answer = response.output.text.strip()
+        return {
+            "answer": answer,
+            "source": source
+        }
     else:
         raise Exception(f"Qwen 调用失败: {response.code} - {response.message}")
 
 
 # 主程序
 if __name__ == "__main__":
-    question = "EAST报送中客户ID字段的要求是什么？"
-    try:
-        answer = rag_query(question)
-        print("\n✅ 最终回答：")
-        print("=" * 60)
-        print(answer)
-        print("=" * 60)
-    except Exception as e:
-        print(f"错误：{e}")
+    print("="*60)
+    print("金融合规RAG，带溯源")
+    print("输入问题，将返回答案和依据")
+    print("输入 'quit' 或 'exit' 退出系统")
+    print("="*60)
+    
+    while True:
+        try:
+            question = input("\n 请输入您的问题：").strip()
+            if not question:
+                continue
+            if question.lower() in ['quit', 'exit', 'q']:
+                print("再见！")
+                break
+            result = rag_query(question,top_k=3)
+            # 输出答案
+            print(f"\n回答:\n{result['answer']}")
+            
+            # 输出溯源
+            print(f"\n依据来源（按相关性排序）:")
+            for i, src in enumerate(result['source'], 1):
+                print(f"\n--- [片段{i}] (相似度: {src['similarity']:.4f}) ---")
+                print(f"原始ID: {src['id']}")
+                print(f"内容: {src['snippet']}")
+        except KeyboardInterrupt:
+            print("中途退出！")
+            break
+        except Exception as e:
+            print(f" 错误: {e}")
